@@ -1,15 +1,22 @@
-# Use an official OpenJDK runtime as the base image
-FROM openjdk:17-jdk-slim
-LABEL authors="HackintoshSA Team"
-
+# Build Stage
+FROM maven:3.8.4-openjdk-17-slim AS build
 
 # Set the working directory inside the container
 WORKDIR /app
+
+# Copy the source code into the container
 COPY . .
+
+# Run Maven to build the JAR file
 RUN mvn clean package
 
-# Copy the JAR file built by Maven/Gradle to the container
+# Runtime Stage
+FROM openjdk:17-jdk-slim
+
+# Set the working directory inside the container
 WORKDIR /app
+
+# Copy the JAR file built in the 'build' stage
 COPY --from=build /app/target/watch-later-spring-1.0.0.jar /app/app.jar
 
 # Expose the port your Spring Boot app will run on (default is 8080)
