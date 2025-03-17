@@ -22,7 +22,7 @@ public class WatchLater {
     private String release_date;
     private String media_type;
     private Boolean video;
-    private ObjectId userId;
+    private String userId;
     private Date createdAt = new Date();
     private Date updatedAt = new Date();
 }

@@ -3,12 +3,14 @@ package com.hackintoshsa.watchlaterspring.controllers;
 import com.hackintoshsa.watchlaterspring.models.User;
 import com.hackintoshsa.watchlaterspring.services.UserService;
 import com.hackintoshsa.watchlaterspring.utils.JwtConfig;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.java.Log;
 import lombok.extern.log4j.Log4j;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -46,6 +48,7 @@ public class AuthController {
     @GetMapping("/loginSuccess")
     public ResponseEntity<?> getUserInfoAndCreateIfNotExist(@RequestHeader("Authorization") String token) {
         log.info("From API: {}" +token);  // Corrected log statement
+
 
 
 

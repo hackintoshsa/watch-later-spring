@@ -4,6 +4,7 @@ import com.hackintoshsa.watchlaterspring.models.User;
 import com.hackintoshsa.watchlaterspring.models.WatchLater;
 import com.hackintoshsa.watchlaterspring.repositories.UserRepository;
 import com.hackintoshsa.watchlaterspring.repositories.WatchLaterRepository;
+import lombok.extern.java.Log;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 @Service
+@Log
 public class WatchLaterService {
     @Autowired
     WatchLaterRepository watchLaterRepository;
@@ -23,8 +25,8 @@ public class WatchLaterService {
         Map<String, Object> response = new HashMap<>();
 
         try{
-            // Retrieve the user from the database using ObjectId
-            Optional<User> userOpt = userRepository.findById(String.valueOf(new ObjectId(userId)));
+
+            Optional<User> userOpt = userRepository.findById(userId);
 
 //            User user = userRepository.findById(String.valueOf(new ObjectId(userId)))
 //                    .orElseThrow(() -> new RuntimeException("User not found."));
@@ -60,7 +62,7 @@ public class WatchLaterService {
 
             // Set movie details and persist to the database
 
-            movie.setUserId(new ObjectId(userId));
+            movie.setUserId(userId);
             movie.setCreatedAt(new Date());
             movie.setUpdatedAt(new Date());
 
@@ -69,10 +71,15 @@ public class WatchLaterService {
             user.getWatchLaterMovieIds().add(movie.getMovieId());
             userRepository.save(user);
 
+            List<WatchLater> watchLaterList = watchLaterRepository.findAllByUserId(userId);
+
+
+
+
 
             response.put("status", 200);
             response.put("message", "Movie added to Watch Later successfully.");
-            response.put("data", movie);
+            response.put("data", watchLaterList);
 
 
         } catch (RuntimeException e) {
@@ -92,11 +99,12 @@ public class WatchLaterService {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            ObjectId userObjectId = new ObjectId(userId);
+            //Since we sub from Google oauth and its string we don't need to make it mongoObject
+            //ObjectId userObjectId = new ObjectId(userId);
 
             // Fetch the watch later list from the repository using the user ID
            // List<WatchLater> watchLaterList = watchLaterRepository.listAllByUserId(userObjectId);
-            List<WatchLater> watchLaterList = watchLaterRepository.findAllByUserId(userObjectId);
+            List<WatchLater> watchLaterList = watchLaterRepository.findAllByUserId(userId);
 
             // Check if the list is empty and populate the response accordingly
             if (watchLaterList != null && !watchLaterList.isEmpty()) {
@@ -122,23 +130,29 @@ public class WatchLaterService {
         return response;
     }
 
-    public Map<String, Object> deleteMovieFromWatchLater(String movieId) {
+    public Map<String, Object> deleteMovieFromWatchLater(Integer movieId) {
         Map<String, Object> response = new HashMap<>();
 
-        try {
-            // Delete the movie from the WatchLater list based on the movieId
-            //WatchLater deletedMovie = watchLaterRepository.deleteById(movieId);
-            Optional<WatchLater> movieOptional = watchLaterRepository.findById(movieId);
+        log.warning("Attempting to delete movie with ID: " + movieId);
 
-            if (movieOptional.isEmpty()) {
+        try {
+            // Fetch all WatchLater entries with the given movieId
+            Optional<WatchLater> movieList = watchLaterRepository.findAllByMovieId(movieId);
+
+            log.warning("Found movies: " + movieList);
+
+            if (movieList.isEmpty()) {
                 response.put("status", "not_found");
                 response.put("statusCode", 404);
                 response.put("message", "Movie not found in Watch Later list.");
                 return response;
             }
 
-            WatchLater movie = movieOptional.get();
-            Optional<User> userOpt = userRepository.findById(movie.getUserId().toString());
+            // For simplicity, let's assume we're deleting the first occurrence of the movie.
+            WatchLater movieToDelete = movieList.get();
+
+            // Fetch user by ID associated with the movie
+            Optional<User> userOpt = userRepository.findById(movieToDelete.getUserId());
 
             if (userOpt.isEmpty()) {
                 response.put("status", "not_found");
@@ -148,10 +162,26 @@ public class WatchLaterService {
             }
 
             User user = userOpt.get();
-            user.getWatchLaterMovieIds().remove(movie.getMovieId());
 
+            if (user.getWatchLaterMovieIds().contains(movieToDelete.getMovieId())) {
+                user.getWatchLaterMovieIds().remove(movieToDelete.getMovieId());
+                // Save the updated user entity
+                userRepository.save(user);
+            } else {
+                response.put("status", "not_found");
+                response.put("statusCode", 404);
+                response.put("message", "Movie not found in user's Watch Later list.");
+                return response;
+            }
+
+            // Remove the movie from the user's Watch Later movie list
+            user.getWatchLaterMovieIds().remove(movieToDelete.getMovieId());
+
+            // Save the updated user entity
             userRepository.save(user);
-            watchLaterRepository.deleteById(movieId);
+
+            // Delete the movie from WatchLater repository
+            watchLaterRepository.deleteByMovieId(movieToDelete.getMovieId());
 
             response.put("status", "success");
             response.put("statusCode", 200);

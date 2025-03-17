@@ -2,7 +2,9 @@ package com.hackintoshsa.watchlaterspring.controllers;
 
 import com.hackintoshsa.watchlaterspring.models.WatchLater;
 import com.hackintoshsa.watchlaterspring.services.WatchLaterService;
+import com.hackintoshsa.watchlaterspring.utils.JwtConfig;
 import jakarta.websocket.server.PathParam;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +17,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/watchlater")
 public class WatchLaterController {
@@ -26,32 +31,64 @@ public class WatchLaterController {
     @Autowired
     private OAuth2AuthorizedClientService authorizedClientService;
 
+    @Autowired
+    private JwtConfig jwtConfig;
+
 
     @GetMapping("/list/{userId}")
-    public ResponseEntity<?> getAllByUser(@PathParam("userId") String userId, @AuthenticationPrincipal Jwt jwt){
+    public ResponseEntity<?> getAllByUser(@PathVariable("userId") String userId,
+                                          @RequestHeader("Authorization") String token) {
         HashMap<String, Object> response = new HashMap<>();
 
-        if (jwt == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid Token");
+        // Validate token early in the method
+        if (token == null || token.isEmpty() || !token.startsWith("Bearer ")) {
+            response.put("message", "Missing or invalid authorization token");
+            response.put("statusCode", 404);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
         }
 
-        // Get the 'sub' claim (or any other claim) from the JWT token
-        String userSub = jwt.getClaim("sub"); // 'sub' is usually the user ID
+        String tokenValue = token.substring("Bearer ".length()).trim();
+        System.out.println("Extracted Token: " + tokenValue);
 
-        if (userSub == null || !userSub.equals(userId)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token does not match user");
-        }
-
-        // Proceed with fetching the data
         try {
-            // Call your service with userSub (for example, to get watch later data for the user)
+            // Validate the Google token
+            if (!jwtConfig.validateGoogleToken(tokenValue)) {
+                response.put("status", "error");
+                response.put("message", "Invalid or expired token...");
+                response.put("error", "Token validation failed");
+                response.put("statusCode", 401);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Get user details from the JWT token
+            Optional<Map<String, Object>> userDetailsOptional = jwtConfig.getUserInfoFromToken(tokenValue);
+
+            // Check if user details are found in the token
+            if (userDetailsOptional.isEmpty()) {
+                response.put("message", "Invalid token or unable to parse user details");
+                response.put("statusCode", 400);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            // Get the userId from the token's "sub" claim
+            String userSub = userDetailsOptional.get().get("sub").toString();
+
+            // Check if the userId from the token matches the URL path userId
+            if (!userSub.equals(userId)) {
+                response.put("message", "Token does not match the user ID in the URL");
+                response.put("statusCode", 401);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Fetch the movie data for the user (service call)
             return ResponseEntity.status(HttpStatus.OK).body(watchLaterService.listAllByUser(userSub));
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error fetching data");
+            response.put("message", "Error fetching data");
+            response.put("statusCode", 500);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
-
-
-
     }
 
     @PostMapping("/add")
@@ -60,7 +97,7 @@ public class WatchLaterController {
     }
 
     @DeleteMapping("/delete/{movieId}")
-    public ResponseEntity<?> deleteByMovieId(@PathVariable("movieId") String movieId){
+    public ResponseEntity<?> deleteByMovieId(@PathVariable("movieId") Integer movieId){
         return ResponseEntity.status(HttpStatus.OK).body(watchLaterService.deleteMovieFromWatchLater(movieId));
     }
 }

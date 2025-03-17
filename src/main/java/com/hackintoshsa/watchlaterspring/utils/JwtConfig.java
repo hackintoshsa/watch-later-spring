@@ -8,7 +8,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
@@ -40,78 +46,6 @@ public class JwtConfig {
 
 
     private JwtDecoder jwtDecoder;
-
-    // Validates Google Token and returns true if valid, false otherwise
-//    public boolean validateGoogleToken(String token) {
-//        try {
-//            String url = "https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=" + token;
-//            ResponseEntity<Map> responseEntity = restTemplate.getForEntity(url, Map.class);
-//
-//            if (responseEntity.getStatusCode() == HttpStatus.OK) {
-//                Map<String, Object> tokenInfo = responseEntity.getBody();
-//                String email = (String) tokenInfo.get("email");
-//                String userId = (String) tokenInfo.get("sub");
-//
-//                // Further validation
-//                return email != null && userId != null;
-//            } else {
-//                // If status code is not OK, log the response code and return false
-//                System.err.println("Invalid response from Google API. Status code: " + responseEntity.getStatusCode());
-//            }
-//        } catch (HttpClientErrorException e) {
-//            // Handle client errors (e.g., bad token, invalid request)
-//            System.err.println("HTTP Client Error while validating token: " + e);
-//        } catch (RestClientException e) {
-//            // Handle RestClient errors (e.g., network issues)
-//            System.err.println("Error during HTTP request to validate token: " + e.getMessage());
-//        } catch (Exception e) {
-//            // Handle unexpected exceptions
-//            System.err.println("Unexpected error while validating token: " + e.getMessage());
-//        }
-//        return false; // Default to invalid if any error occurs
-//    }
-
-    // Retrieves user info from the token
-//    public Optional<Map<String, Object>> getUserInfoFromToken(String token) {
-//        try {
-//            String url = "https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=" + token;
-//            ResponseEntity<Map> responseEntity = restTemplate.getForEntity(url, Map.class);
-//
-//            // If the response is OK, extract and return user details
-//            if (responseEntity.getStatusCode() == HttpStatus.OK) {
-//                Map<String, Object> tokenInfo = responseEntity.getBody();
-//
-//                String name = (String) tokenInfo.get("name");
-//                String email = (String) tokenInfo.get("email");
-//                String picture = (String) tokenInfo.get("picture");
-//                String userId = (String) tokenInfo.get("sub");
-//
-//                Map<String, Object> userDetails = new HashMap<>();
-//                userDetails.put("name", name);
-//                userDetails.put("email", email);
-//                userDetails.put("picture", picture);
-//                userDetails.put("sub", userId);
-//
-//                return Optional.of(userDetails);
-//            } else {
-//                // Log status code if response is not OK
-//                System.err.println("Invalid response from Google API. Status code: " + responseEntity.getStatusCode());
-//            }
-//        } catch (HttpClientErrorException e) {
-//            // Handle HTTP client errors like invalid token or bad request
-//            System.err.println("HTTP Client Error while fetching user info: " + e.getMessage());
-//        } catch (RestClientException e) {
-//            // Handle RestClient errors (e.g., network issues)
-//            System.err.println("Error during HTTP request to fetch user info: " + e.getMessage());
-//        } catch (Exception e) {
-//            // Handle unexpected exceptions
-//            System.err.println("Unexpected error while fetching user info: " + e.getMessage());
-//        }
-//
-//        // Return empty if token is invalid or expired
-//        return Optional.empty();
-//    }
-
 
     private final ClientRegistrationRepository clientRegistrationRepository;
 
@@ -152,6 +86,7 @@ public class JwtConfig {
         try {
             Jwt jwt = jwtDecoder.decode(token);
 
+
             log.info("jwt" + jwt);
 
             // Security: Verify issuer claim
@@ -182,7 +117,8 @@ public class JwtConfig {
     // This method is used to extract user details from the validated token.
     public Optional<Map<String, Object>> getUserInfoFromToken(String token) {
         try {
-            //JwtDecoder jwtDecoder = NimbusJwtDecoder.withJwkSetUri(issuerUri + "/.well-known/jwks.json").build();
+            //JwtDecoder jwtDecoder = NimbusJ
+            // wtDecoder.withJwkSetUri(issuerUri + "/.well-known/jwks.json").build();
             Jwt jwt = jwtDecoder.decode(token);
 
             // Extract user info from the JWT payload
@@ -190,6 +126,7 @@ public class JwtConfig {
             String email = jwt.getClaimAsString("email");
             String picture = jwt.getClaimAsString("picture");
             String sub = jwt.getClaimAsString("sub");
+
 
             Map<String, Object> userInfo = Map.of(
                     "name", name,
